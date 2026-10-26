@@ -1,0 +1,99 @@
+---
+title: "Week04_Chong"
+output: html_document
+date: "2026-10-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Data Import
+
+Importing a data set containing info about the titles available on Netflix as of September 25, 2021 (the most recent update). 
+
+```{r}
+library(tidyverse)
+netflix_titles <- read_csv("netflix_titles.csv")
+netflix_titles
+
+netflix_titles_select <- netflix_titles %>%
+  select("title", "type", "country", "date_added", "release_year", "rating", "duration", "listed_in")
+
+netflix_titles_select
+```
+
+
+## Categorical Variable
+
+```{r - Categorical Variable Bar Plot} 
+library(ggplot2)
+
+netflix_titles_select %>%
+  filter(type == "Movie") %>%
+  group_by(rating) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(x = count, y = rating, label = count)) +
+  geom_col() + 
+  geom_text(position = position_stack(), hjust = -0.1) +  
+  coord_cartesian(clip = "off") + 
+  theme(plot.margin = margin(5.5, 30, 5.5, 5.5, "pt"))
+
+
+```
+
+The majority of movies (2062) in this dataset are rated TV-MA, followed by TV-14 (1427). Rated R movies (797) exceed that of TV-PG (540) and PG-13 (490) movies. There are 413 G or TV-G movies in the dataset. 
+
+## Continuous Variable
+
+```{r - Continuous Variable Histogram}
+netflix_movies <- 
+  netflix_titles_select %>%
+  filter(type == "Movie")
+
+#Convert duration column to just minutes
+netflix_movies <- netflix_movies %>% 
+  mutate(duration_min = parse_number(duration))
+
+netflix_movies %>%
+  ggplot(aes(x = duration_min)) + 
+  geom_histogram(bins = 45)
+
+#Distribution is approximately normal, so print Mean and Standard Dev
+
+cat("Mean:",round(mean(netflix_movies$duration_min), 2), "minutes")
+cat("SD:",round(sd(netflix_movies$duration_min), 2), "minutes")
+
+print(summary(netflix_movies$duration_min))
+```
+Of movies on Netflix in September 2021, there is an approximately normal distribution of duration time. The average length of movies in this data set is almost 100 minutes. There are a few movies in the data set that are markedly longer, with the longest movie at 312 minutes long. 
+
+## Two variable relationships
+
+```{r - Two Variable Relationships}
+#I'm interested in determining the relationship between movie rating and the duration of the movie. 
+
+rating_order <- c("G", "PG", "PG-13", "R", "NR")
+
+netflix_movies %>%
+  mutate(rating = factor(rating, levels = rating_order)) %>% 
+  filter(rating == "G" | rating == "PG" | rating == "PG-13" | rating == "R" | rating == "NR") %>%
+  ggplot(aes(x = rating, y = duration_min, fill = rating)) + 
+  geom_boxplot()
+
+```
+In this data set, G rated movies have the shortest duration, with a median of 84 minutes. PG movies are longer, with a median length of 95 minutes. R and PG-13 movies in this data set are the longest, with median run times of 103 and 106 minutes, respectively. This suggests that, here, movies with more mature themes tend to be longer in run time. The longest movie on Netflix as of September 2021 is rated R, whereas the shortest movie with a G, PG, PG-13, R, or NR rating is a PG-13 movie called "Cops and Robbers" that is 8 minutes long. There are no R movies in the set below 50 minutes in length. 
+```{r}
+netflix_movies %>% 
+  filter(rating == "G" | rating == "PG" | rating == "PG-13" | rating == "R" | rating == "NR") %>%
+  group_by(rating) %>%
+  summarize(median_time = median(duration_min))
+
+```
+```{r}
+netflix_movies %>%
+  filter(rating == "G" | rating == "PG" | rating == "PG-13" | rating == "R" | rating == "NR") %>%
+  arrange(duration_min)
+```
+
+
+

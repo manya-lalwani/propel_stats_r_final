@@ -1,0 +1,72 @@
+---
+title: "Week05_Chong"
+output: html_document
+date: "2026-10-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Import
+Import data of the titles on Netflix in September 2021 and filter for movies. 
+```{r - Data Import}
+library(tidyverse)
+library(ggplot2)
+
+netflix_titles <- read_csv("netflix_titles.csv")
+
+netflix_movies <- netflix_titles %>%
+  select("type", "title", "country", "release_year", "rating", "duration", "listed_in")
+
+#converts the duration column (char) to numerical values
+netflix_movies <- netflix_movies %>% 
+  mutate(duration_min = parse_number(duration))
+
+netflix_movies
+
+```
+
+## Task 1 - State null and alternative hypothesis
+
+Null hypothesis: Rated R and rated G movies do not have different lengths. 
+Alternative hypothesis: Rated R movies are longer than rated G movies. 
+
+Task 2 - Check Normality
+```{r - Normality - G movies}
+netflix_movies %>%
+  filter(rating == "G") %>%
+  ggplot() + 
+  geom_histogram(aes(x = duration_min, na.rm = TRUE), bins = 50)
+
+#The distribution has a slight right skew
+```
+```{r - Normality - R movies}
+netflix_movies %>%
+  filter(rating == "R") %>%
+  ggplot() + 
+  geom_histogram(aes(x = duration_min, ), bins = 50)
+
+#The distribution has a slight right skew
+```
+Both the G and R rated movies are mostly normal with a slight right skew in their distribution. Because I am comparing two groups with mostly normal distribution, I will use a t-test, but I will also analyze with a Wilcoxon rank sum test to see if the skew significantly affects the data. 
+
+Task 3 - Run appropriate test
+```{r}
+movies_R_G <- netflix_movies %>%
+  filter (rating == "G" | rating == "R") 
+
+t.test(duration_min ~ rating, data = movies_R_G, na.rm = TRUE)
+
+```
+```{r - Wilcoxon Rank Sum}
+#Testing if the slight right skew affects the outcome of significance.
+wilcox.test(duration_min ~ rating, data = movies_R_G, na.rm = TRUE)
+
+```
+
+Task 4 - Written conclusion
+
+My data showed a mostly normal distribution, so I used a t-test to compare the means of each group. Based on the results, I can reject the null hypothesis that movies rated R and G on Netflix do not differ in length. The p-value is ~0.0008, which indicates that there is a 0.08% chance that this finding was based on chance if the null hypothesis was true. If I were making an error, it would be a Type 1 error in which I reject the null hypothesis when it is actually true. This would come from using a significance level that is too generous. However, the standard significance level is 0.05, or 0.01 for more stringent significance, and my p value is notably below that. 
+
+To test if the slight right skew in my data affects the utility of a t test, I also ran a Wilcoxon rank sum test, which is used for strong skew or outliers. Using this test, I also receive a p value that is significant (p value = 5.916e-10), indicating that the null hypothesis can be rejected with confidence. 
