@@ -1,0 +1,97 @@
+---
+title: "Inferential Statistics"
+author: "Reese Robinson, Maddy Chong, Tianna Le, Manya Lalwani"
+output: html_document
+---
+
+## Data
+
+```{r data}
+library(tidyverse)
+netflix_titles <- read_csv("netflix_titles.csv")
+head(netflix_titles)
+```
+
+## Step 3: Inferential Statistics
+
+The research question for this part of the project is, how accurately can we predict the genre of a movie based on its director, release year, and rating?
+
+```{r test_train_split}
+library(dplyr)
+library(tidyr)
+library(forcats)
+library(caret)
+library(nnet)
+library(car)
+library(ggplot2)
+
+netflix_movies <- netflix_titles %>% filter(type == "Movie")
+netflix_movies <- netflix_movies %>% filter(listed_in %in% c('Children & Family Movies', 'Dramas', 'Horror Movies') )
+netflix_movies <- netflix_movies %>% select(director, release_year, rating, listed_in)
+netflix_movies <- netflix_movies %>% drop_na()
+netflix_movies <- netflix_movies %>% mutate(listed_in = factor(listed_in), rating = factor(rating), director = factor(director)) %>% droplevels()
+
+train_indices <- createDataPartition(netflix_movies$listed_in,p = 0.80,list = FALSE)[, 1]
+
+netflix_movies_train <- netflix_movies[train_indices, ] %>% droplevels()
+netflix_movies_test <- netflix_movies[-train_indices, ] %>% droplevels()
+
+# simplify directors by combinging rare ones
+netflix_movies_train$director <- fct_lump_min(netflix_movies_train$director, min = 5, other_level = "Other")
+train_directors <- levels(netflix_movies_train$director)
+test_directors <- as.character(netflix_movies_test$director)
+test_directors[!test_directors %in% train_directors] <- "Other"
+netflix_movies_test$director <- factor(test_directors,levels = train_directors)
+```
+
+```{r check-data}
+ggplot(netflix_movies_train, aes(x = listed_in)) +
+  geom_bar(fill = "blue")
+
+ggplot(netflix_movies_test, aes(x = listed_in)) +
+  geom_bar(fill = "red")
+```
+
+```{r train-logistic-model}
+model <- multinom(formula = listed_in ~ release_year + rating + director, data = netflix_movies_train)
+summary(model)
+```
+
+```{r multicollinearity}
+vif_model <- lm(release_year ~ rating + director, data = netflix_movies_train)
+vif(vif_model)
+```
+
+```{r accuracy}
+train_pred <- predict(model,newdata = netflix_movies_train,type = "class")
+test_pred <- predict(model,newdata = netflix_movies_test,type = "class")
+
+train_cm <- confusionMatrix(factor(train_pred, levels = levels(netflix_movies_train$listed_in)), netflix_movies_train$listed_in)
+
+test_cm <- confusionMatrix(factor(test_pred, levels = levels(netflix_movies_train$listed_in)), factor(netflix_movies_test$listed_in, levels = levels(netflix_movies_train$listed_in)))
+
+train_cm
+test_cm
+
+cat("Training accuracy:", round(train_cm$overall["Accuracy"], 3), "\n")
+cat("Testing accuracy:", round(test_cm$overall["Accuracy"], 3), "\n")
+```
+
+```{r confusion-matrix}
+confusion_df <- as.data.frame(test_cm$table)
+
+ggplot(
+  confusion_df,
+  aes(x = Prediction, y = Reference, fill = Freq)
+) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), size = 5) +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  labs(
+    title = "Test Set Confusion Matrix",
+    x = "Predicted Genre",
+    y = "Actual Genre",
+    fill = "Count"
+  ) +
+  theme_minimal()
+```
