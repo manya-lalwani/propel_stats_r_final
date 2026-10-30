@@ -1,0 +1,90 @@
+---
+title: "Final Project Descriptive Statistics"
+output: html_document
+author: "Reese Robinson, Maddy Chong, Tianna Le, Manya Lalwani"
+date: "2026-10-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Import
+Importing a data set containing info about the titles available on Netflix as of September 25, 2021 (the most recent update). 
+
+```{r - Data Import}
+library(tidyverse)
+library(ggplot2)
+
+netflix_titles <- read_csv("netflix_titles.csv")
+
+netflix_movies <- netflix_titles %>%
+  select("type", "title", "country", "release_year", "rating", "duration", "listed_in") %>%
+  filter(type == "Movie")
+
+#converts the duration column (char) to numerical values and combines movie and TV movie ratings
+netflix_movies <- netflix_movies %>% 
+  mutate(duration_min = parse_number(duration)) %>%
+  mutate(rating = case_when(
+    rating %in% c("TV-G", "G") ~ "G",     
+    rating %in% c("TV-PG", "PG") ~ "PG",
+    TRUE ~ rating)) %>%
+  filter(rating == "G" | rating == "PG" |
+           rating == "PG-13" | rating == "R") #Selects standard movie ratings
+
+
+netflix_movies
+```
+
+## Graphing Movies in Each Rating
+```{r - Number of Movies by Rating (Categorical Variable)} 
+rating_order <- c("G", "PG", "PG-13", "R")
+
+netflix_movies %>%
+  group_by(rating) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(x = count, y = rating, label = count, fill = rating)) +
+  geom_col() + 
+  geom_text(position = position_stack(), hjust = -0.1) +  
+  coord_cartesian(clip = "off") + 
+  theme(plot.margin = margin(5.5, 30, 5.5, 5.5, "pt")) + 
+  scale_y_discrete(limits = rev(rating_order))
+
+```
+
+In this data set, the PG rating has the most movies (827 movies), followed by R rated movies (797), then PG-13 (490), and finally G rated movies (167). 
+
+## Graphing Distribution of Movie Durations
+```{r - Movie Duration (Cont. Variable)}
+netflix_movies %>%
+  ggplot(aes(x = duration_min)) + 
+  geom_histogram(bins = 45) + 
+  scale_x_continuous(breaks = seq(0, 330, by = 30)) # Ticks every 30 minutes from 0 to 300
+
+#Distribution is approximately normal, so print Mean and Standard Dev
+
+cat("Mean:", round(mean(netflix_movies$duration_min, na.rm = TRUE), 2), "minutes")
+cat("SD:", round(sd(netflix_movies$duration_min, na.rm = TRUE), 2), "minutes")
+
+print(summary(netflix_movies$duration_min))
+```
+
+Of movies on Netflix in September 2021, there is an approximately normal distribution of duration time with some abnormality in the left tail. The average length of movies in this data set is about 100 minutes. There are a few movies in the data set that are much longer and a small cluster around the 45 minute mark.
+
+
+## Graphing Movie Lengths by Rating
+```{r - Movie Lengths by Rating}
+netflix_movies %>%
+  mutate(rating = factor(rating, levels = rating_order)) %>% 
+  ggplot(aes(x = rating, y = duration_min, fill = rating)) + 
+  geom_boxplot() + 
+  stat_summary( #Adds text label for median
+    fun = median,
+    geom = "text", 
+    vjust = -0.4, #Puts text slightly above median line, 
+    size = 3,
+    aes(label = paste("median:", round(after_stat(y), 1)))
+  )
+```
+
+In this data set, G rated movies have the shortest duration, with a median of 84 minutes. PG movies are longer, with a median length of 95 minutes. R and PG-13 movies in this data set are the longest, with median run times of 103 and 106 minutes, respectively. This suggests that, here, movies with more mature themes tend to be longer in run time. PG movies have a larger spread in duration than other movies, and the longest movie is rated G. 
